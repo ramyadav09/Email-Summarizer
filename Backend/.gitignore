@@ -1,0 +1,14 @@
+# Virtual environment
+myenv/
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Secrets & OAuth tokens
+.env
+credentials.json
+token.json
+token.pickle
