@@ -5,7 +5,11 @@ import Header from "../components/Header";
 import {
   fetchEmailById,
   summarizeEmail,
+  generateReply,
+  sendReply,
   clearSelected,
+  setReplyDraft,
+  clearSendStatus,
 } from "../store/emailSlice";
 
 /* Sandboxed iframe wrapper for HTML emails — like Gmail does */
@@ -65,19 +69,58 @@ export default function EmailPage({ onLogout }) {
   const summaryLoading = useSelector((s) => s.email.summaryLoading);
   const summaryError = useSelector((s) => s.email.summaryError);
   const summary = useSelector((s) => s.email.summaries[id]);
+  const replyLoading = useSelector((s) => s.email.replyLoading);
+  const replyError = useSelector((s) => s.email.replyError);
+  const replyDraft = useSelector((s) => s.email.generatedReplies[id]) || "";
+  const sendLoading = useSelector((s) => s.email.sendLoading);
+  const sendError = useSelector((s) => s.email.sendError);
+  const sendSuccess = useSelector((s) => s.email.sendSuccess);
 
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showReply, setShowReply] = useState(false);
+  const [showBody, setShowBody] = useState(false);
 
   useEffect(() => {
     dispatch(fetchEmailById({ token, id }));
+    dispatch(clearSendStatus());
     return () => {
       dispatch(clearSelected());
     };
   }, [dispatch, token, id]);
 
   const handleSummarize = () => {
-    dispatch(summarizeEmail({ token, id }));
+    const bodyText = email?.body || email?.snippet || "";
+    dispatch(summarizeEmail({ token, id, body: bodyText }));
+  };
+
+  const handleGenerateReply = () => {
+    const bodyText = email?.body || email?.snippet || "";
+    dispatch(
+      generateReply({
+        token,
+        id,
+        from: email?.from || "",
+        subject: email?.subject || "",
+        body: bodyText,
+      })
+    );
+    setShowReply(true);
+  };
+
+  const handleSendReply = () => {
+    if (!replyDraft.trim() || !email) return;
+    dispatch(
+      sendReply({
+        token,
+        id,
+        threadId: email.thread_id || "",
+        to: email.from || "",
+        subject: email.subject || "",
+        body: replyDraft,
+        messageId: email.message_id || "",
+      })
+    );
   };
 
   const handleCopy = async () => {
@@ -312,14 +355,127 @@ export default function EmailPage({ onLogout }) {
           {/* Divider */}
           <div className="mx-4 border-t border-gray-100" />
 
-          {/* Body — fixed height with scroll */}
-          <div className="px-4 py-3 max-h-[380px] overflow-y-auto">
-            {hasHtml ? (
-              <HtmlEmailBody html={email.body_html} />
+          {/* Body — toggleable visibility */}
+          <div className="px-4 py-2">
+            <button
+              onClick={() => setShowBody(!showBody)}
+              className="flex items-center gap-1.5 text-[10px] font-medium text-gray-500 hover:text-indigo-600 transition-colors group"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform ${showBody ? "rotate-90" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              {showBody ? "Hide Email Content" : "Show Email Content"}
+            </button>
+          </div>
+
+          {showBody && (
+            <div className="px-4 pb-3 max-h-[380px] overflow-y-auto">
+              {hasHtml ? (
+                <HtmlEmailBody html={email.body_html} />
+              ) : (
+                <p className="text-[11px] text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                  {email.body || email.snippet || "No content available."}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="mx-4 border-t border-gray-100" />
+
+          {/* Reply section */}
+          <div className="px-4 py-3">
+            {!showReply && !replyDraft ? (
+              <button
+                onClick={handleGenerateReply}
+                disabled={replyLoading}
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-indigo-200 text-indigo-600 text-xs font-medium rounded-lg hover:bg-indigo-50 disabled:opacity-50 active:scale-95 transition-all"
+              >
+                {replyLoading && (
+                  <span className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                )}
+                {replyLoading ? "Generating\u2026" : "\u21a9 Generate AI Reply"}
+              </button>
             ) : (
-              <p className="text-[11px] text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
-                {email.body || email.snippet || "No content available."}
-              </p>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                    Reply
+                  </span>
+                  {!replyDraft && !replyLoading && (
+                    <button
+                      onClick={handleGenerateReply}
+                      className="text-[10px] text-indigo-500 hover:text-indigo-700 transition-colors"
+                    >
+                      Regenerate
+                    </button>
+                  )}
+                </div>
+
+                {replyLoading && !replyDraft ? (
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-3 w-full bg-gray-100 rounded" />
+                    <div className="h-3 w-full bg-gray-100 rounded" />
+                    <div className="h-3 w-2/3 bg-gray-100 rounded" />
+                  </div>
+                ) : (
+                  <textarea
+                    value={replyDraft}
+                    onChange={(e) =>
+                      dispatch(setReplyDraft({ id, text: e.target.value }))
+                    }
+                    rows={5}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-gray-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"
+                    placeholder="Type your reply or generate one with AI\u2026"
+                  />
+                )}
+
+                {replyError && (
+                  <p className="text-[10px] text-red-500">{replyError}</p>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSendReply}
+                    disabled={sendLoading || !replyDraft.trim() || sendSuccess}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 active:scale-95 transition-all shadow-sm"
+                  >
+                    {sendLoading && (
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {sendLoading ? "Sending\u2026" : sendSuccess ? "\u2713 Sent" : "Send Reply"}
+                  </button>
+                  {!sendSuccess && !sendLoading && (
+                    <button
+                      onClick={() => {
+                        setShowReply(false);
+                        dispatch(clearSendStatus());
+                      }}
+                      className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  {sendError && (
+                    <p className="text-[10px] text-red-500">{sendError}</p>
+                  )}
+                </div>
+
+                {sendSuccess && (
+                  <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Reply sent successfully!
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

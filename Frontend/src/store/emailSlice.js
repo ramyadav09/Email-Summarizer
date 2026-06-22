@@ -41,7 +41,7 @@ export const fetchEmailById = createAsyncThunk(
 
 export const summarizeEmail = createAsyncThunk(
   "email/summarize",
-  async ({ token, id }, { rejectWithValue }) => {
+  async ({ token, id, body }, { rejectWithValue }) => {
     try {
       const res = await fetch(`${API}/api/summarize`, {
         method: "POST",
@@ -49,11 +49,64 @@ export const summarizeEmail = createAsyncThunk(
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, body: body || undefined }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       return { id, summary: data.summary };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const generateReply = createAsyncThunk(
+  "email/generateReply",
+  async ({ token, id, from, subject, body }, { rejectWithValue }) => {
+    try {
+      const res = await fetch(`${API}/api/generate-response`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          from_addr: from || undefined,
+          subject: subject || undefined,
+          body: body || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      return { id, reply: data.reply };
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const sendReply = createAsyncThunk(
+  "email/sendReply",
+  async ({ token, id, threadId, to, subject, body, messageId }, { rejectWithValue }) => {
+    try {
+      const res = await fetch(`${API}/api/send-reply`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          thread_id: threadId,
+          to,
+          subject,
+          body,
+          message_id: messageId || "",
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return await res.json();
     } catch (err) {
       return rejectWithValue(err.message);
     }
@@ -72,6 +125,7 @@ const emailSlice = createSlice({
     list: [],
     selected: null,
     summaries: {},
+    generatedReplies: {},
     filters: {
       after: thirtyDaysAgo,
       before: today,
@@ -80,10 +134,15 @@ const emailSlice = createSlice({
     loading: false,
     detailLoading: false,
     summaryLoading: false,
+    replyLoading: false,
+    sendLoading: false,
     loaded: false,
     error: null,
     detailError: null,
     summaryError: null,
+    replyError: null,
+    sendError: null,
+    sendSuccess: false,
   },
   reducers: {
     setFilter(state, action) {
@@ -93,6 +152,17 @@ const emailSlice = createSlice({
     clearSelected(state) {
       state.selected = null;
       state.detailError = null;
+      state.replyError = null;
+      state.sendError = null;
+      state.sendSuccess = false;
+    },
+    setReplyDraft(state, action) {
+      const { id, text } = action.payload;
+      state.generatedReplies[id] = text;
+    },
+    clearSendStatus(state) {
+      state.sendError = null;
+      state.sendSuccess = false;
     },
     clearError(state) {
       state.error = null;
@@ -126,6 +196,11 @@ const emailSlice = createSlice({
       .addCase(fetchEmailById.fulfilled, (state, action) => {
         state.detailLoading = false;
         state.selected = action.payload;
+        // Mark the email as read in the inbox list
+        const idx = state.list.findIndex((e) => e.id === action.payload.id);
+        if (idx !== -1) {
+          state.list[idx].is_read = true;
+        }
       })
       .addCase(fetchEmailById.rejected, (state, action) => {
         state.detailLoading = false;
@@ -146,8 +221,39 @@ const emailSlice = createSlice({
         state.summaryLoading = false;
         state.summaryError = action.payload || "Failed to summarize.";
       });
+
+    /* generate reply */
+    builder
+      .addCase(generateReply.pending, (state) => {
+        state.replyLoading = true;
+        state.replyError = null;
+      })
+      .addCase(generateReply.fulfilled, (state, action) => {
+        state.replyLoading = false;
+        state.generatedReplies[action.payload.id] = action.payload.reply;
+      })
+      .addCase(generateReply.rejected, (state, action) => {
+        state.replyLoading = false;
+        state.replyError = action.payload || "Failed to generate reply.";
+      });
+
+    /* send reply */
+    builder
+      .addCase(sendReply.pending, (state) => {
+        state.sendLoading = true;
+        state.sendError = null;
+        state.sendSuccess = false;
+      })
+      .addCase(sendReply.fulfilled, (state) => {
+        state.sendLoading = false;
+        state.sendSuccess = true;
+      })
+      .addCase(sendReply.rejected, (state, action) => {
+        state.sendLoading = false;
+        state.sendError = action.payload || "Failed to send reply.";
+      });
   },
 });
 
-export const { setFilter, clearSelected, clearError } = emailSlice.actions;
+export const { setFilter, clearSelected, clearError, setReplyDraft, clearSendStatus } = emailSlice.actions;
 export default emailSlice.reducer;
