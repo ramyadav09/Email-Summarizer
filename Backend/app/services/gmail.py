@@ -24,7 +24,9 @@ def get_gmail_service(token: str):
     return build("gmail", "v1", credentials=creds)
 
 
-def fetch_emails(token: str, after: str = None, before: str = None) -> list:
+def fetch_emails(
+    token: str, after: str = None, before: str = None, read_status: str = None
+) -> list:
     service = get_gmail_service(token)
     domains = " OR ".join(f"from:(*@{domain})" for domain in ALLOWED_DOMAINS)
     query = f"({domains})"
@@ -32,11 +34,10 @@ def fetch_emails(token: str, after: str = None, before: str = None) -> list:
         query += f" after:{after}"
     if before:
         query += f" before:{before}"
+    if read_status:
+        query += f" is:{read_status}"
     results = (
-        service.users()
-        .messages()
-        .list(userId="me", q=query, maxResults=10)
-        .execute()
+        service.users().messages().list(userId="me", q=query, maxResults=20).execute()
     )  # return msg's ids
     messages = results.get("messages", [])
     emails = []

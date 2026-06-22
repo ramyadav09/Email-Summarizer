@@ -14,6 +14,7 @@ export default function InboxPage({ token, onLogout }) {
   const [error, setError] = useState(null);
   const [after, setAfter] = useState(thirtyDaysAgo);
   const [before, setBefore] = useState(today);
+  const [readStatus, setReadStatus] = useState("");
 
   const toGmailDate = (dateStr) => dateStr.replace(/-/g, "/");
 
@@ -24,6 +25,7 @@ export default function InboxPage({ token, onLogout }) {
       const params = new URLSearchParams();
       if (after) params.set("after", toGmailDate(after));
       if (before) params.set("before", toGmailDate(before));
+      if (readStatus) params.set("read_status", readStatus);
       const res = await fetch(
         `http://localhost:8000/api/emails?${params.toString()}`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -49,7 +51,7 @@ export default function InboxPage({ token, onLogout }) {
 
         {/* Date filter */}
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Filter by Date</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Filters</p>
           <div className="flex flex-col sm:flex-row gap-3 items-end">
             <div className="flex-1">
               <label className="text-xs text-gray-500 mb-1 block">From</label>
@@ -71,6 +73,18 @@ export default function InboxPage({ token, onLogout }) {
                 onChange={(e) => setBefore(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 mb-1 block">Status</label>
+              <select
+                value={readStatus}
+                onChange={(e) => setReadStatus(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+              >
+                <option value="">All</option>
+                <option value="read">Read</option>
+                <option value="unread">Unread</option>
+              </select>
             </div>
             <button
               onClick={loadEmails}

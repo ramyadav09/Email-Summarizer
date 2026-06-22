@@ -11,10 +11,15 @@ class SummarizeRequest(BaseModel):
 
 
 @router.get("/emails")
-def get_emails(authorization: str = Header(...), after: str = None, before: str = None):
+def get_emails(
+    authorization: str = Header(...),
+    after: str = None,
+    before: str = None,
+    read_status: str = None,
+):
     token = authorization.removeprefix("Bearer ")
     try:
-        return fetch_emails(token, after=after, before=before)
+        return fetch_emails(token, after=after, before=before, read_status=read_status)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
