@@ -1,22 +1,32 @@
-import { useState } from "react";
-import { useAuth0 } from "@auth0/auth0-react";
+import { useState, useEffect } from "react";
 import Header from "../components/Header";
 import EmailCard from "../components/EmailCard";
-import MOCK_EMAILS from "../data/mockEmails";
 
-export default function InboxPage() {
-  const { user, logout, getAccessTokenSilently } = useAuth0();
-  const [emails, setEmails] = useState(MOCK_EMAILS);
+export default function InboxPage({ token, onLogout }) {
+  const [emails, setEmails] = useState([]);
+
+  useEffect(() => {
+    const loadEmails = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/api/emails", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        setEmails(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load emails:", err);
+      }
+    };
+    loadEmails();
+  }, [token]);
 
   const handleSummarize = (id, summary) =>
     setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, summary } : e)));
 
-  const handleLogout = () =>
-    logout({ logoutParams: { returnTo: window.location.origin } });
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header user={user} onLogout={handleLogout} />
+      <Header onLogout={onLogout} />
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-800">Your Inbox</h2>
@@ -28,7 +38,7 @@ export default function InboxPage() {
               key={email.id}
               email={email}
               onSummarize={handleSummarize}
-              getToken={getAccessTokenSilently}
+              getToken={() => token}
             />
           ))}
         </div>

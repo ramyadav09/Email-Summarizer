@@ -1,7 +1,12 @@
 langchain
 langchain-community
 langchain-google-community
+langchain-mistralai
 google-api-python-client
 google-auth
 google-auth-oauthlib
 fastapi
+uvicorn
+python-dotenv
+itsdangerous
+starlette

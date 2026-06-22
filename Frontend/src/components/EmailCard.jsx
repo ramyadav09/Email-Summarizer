@@ -6,14 +6,16 @@ export default function EmailCard({ email, onSummarize, getToken }) {
   const handleSummarize = async () => {
     setLoading(true);
     const token = await getToken();
-    console.log("access_token:", token); // remove once backend is connected
-    // const res = await fetch("/api/summarize", {
-    //   method: "POST",
-    //   headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    //   body: JSON.stringify({ id: email.id }),
-    // });
-    await new Promise((r) => setTimeout(r, 1200)); // replace with real API call
-    onSummarize(email.id, "AI-generated summary will appear here once the backend is connected.");
+    const res = await fetch("http://localhost:8000/api/summarize", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id: email.id }),
+    });
+    const data = await res.json();
+    onSummarize(email.id, data.summary);
     setLoading(false);
   };
 
