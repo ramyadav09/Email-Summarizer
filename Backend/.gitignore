@@ -10,6 +10,7 @@ __pycache__/
 # Secrets & OAuth tokens
 .env
 credentials.json
+client_secret.json
 token.json
 token.pickle
 client_secret.json
