@@ -1,11 +1,12 @@
 from langchain_mistralai import ChatMistralAI
-from langchain_core.messages import HumanMessage
 from app.config import MISTRAL_API_KEY
+from langchain_core.prompts import ChatPromptTemplate
 
 
 def summarize(text: str) -> str:
     llm = ChatMistralAI(model="mistral-large-latest", api_key=MISTRAL_API_KEY)
-    response = llm.invoke(
-        [HumanMessage(content=f"Summarize this email in 2/3 sentences:\n\n{text}")]
+    prompt = ChatPromptTemplate.from_template(
+        "Summarize this email in 2-3 sentences:\n\n{text}"
     )
+    response = llm.invoke(prompt.format_messages(text=text))
     return response.content

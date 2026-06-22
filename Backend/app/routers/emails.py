@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-from app.services.gmail import fetch_emails, fetch_email_body
+from app.services.gmail import fetch_emails, fetch_email_body, fetch_email_detail
 from app.services.summarizer import summarize
 
 router = APIRouter(prefix="/api")
@@ -24,6 +24,15 @@ def get_emails(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/emails/{id}")
+async def get_email_by_id(id: str, authorization: str = Header(...)):
+    token = authorization.removeprefix("Bearer ")
+    try:
+        return fetch_email_detail(token, id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/summarize")
 def summarize_email(req: SummarizeRequest, authorization: str = Header(...)):
     token = authorization.removeprefix("Bearer ")
@@ -32,3 +41,7 @@ def summarize_email(req: SummarizeRequest, authorization: str = Header(...)):
         return {"summary": summarize(body)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# @router.post("/chat")
+# def

@@ -1,4 +1,11 @@
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
+
 export default function LoginPage() {
+  const token = useSelector((s) => s.auth.token);
+
+  if (token) return <Navigate to="/inbox" replace />;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-xl p-10 max-w-md w-full text-center border border-gray-100">

@@ -5,6 +5,23 @@ from google_auth_oauthlib.flow import Flow
 from app.config import CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, SCOPES, ALLOWED_DOMAINS
 
 
+def _decode_body(data: str) -> str:
+    """Decode base64url-encoded email body data."""
+    return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
+
+
+def _extract_part_by_type(payload, mime_type: str) -> str:
+    """Recursively walk MIME parts to find a specific mime type."""
+    if payload.get("mimeType") == mime_type and payload.get("body", {}).get("data"):
+        return _decode_body(payload["body"]["data"])
+
+    for part in payload.get("parts", []):
+        result = _extract_part_by_type(part, mime_type)
+        if result:
+            return result
+    return ""
+
+
 def make_flow() -> Flow:
     client_config = {
         "web": {
@@ -74,10 +91,46 @@ def fetch_email_body(token: str, email_id: str) -> str:
         .get(userId="me", id=email_id, format="full")
         .execute()
     )
-    for part in detail.get("payload", {}).get("parts", []):
-        if part.get("mimeType") == "text/plain":
-            data = part["body"].get("data", "")
-            return base64.urlsafe_b64decode(data + "==").decode(
-                "utf-8", errors="ignore"
-            )
+    payload = detail.get("payload", {})
+    plain = _extract_part_by_type(payload, "text/plain")
+    if plain:
+        return plain
+    html = _extract_part_by_type(payload, "text/html")
+    if html:
+        return html
     return detail.get("snippet", "")
+
+
+def fetch_email_detail(token: str, email_id: str) -> dict:
+    service = get_gmail_service(token)
+    detail = (
+        service.users()
+        .messages()
+        .get(userId="me", id=email_id, format="full")
+        .execute()
+    )
+    payload = detail.get("payload", {})
+    headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
+
+    # extract plain text and html bodies
+    body_plain = _extract_part_by_type(payload, "text/plain")
+    body_html = _extract_part_by_type(payload, "text/html")
+
+    # fallback: if neither found, use snippet
+    if not body_plain and not body_html:
+        body_plain = detail.get("snippet", "")
+
+    # extract labels
+    labels = detail.get("labelIds", [])
+
+    return {
+        "id": email_id,
+        "from": headers.get("From", ""),
+        "to": headers.get("To", ""),
+        "subject": headers.get("Subject", ""),
+        "snippet": detail.get("snippet", ""),
+        "body": body_plain,
+        "body_html": body_html,
+        "date": headers.get("Date", ""),
+        "labels": labels,
+    }
