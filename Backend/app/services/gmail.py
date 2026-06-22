@@ -83,22 +83,42 @@ def fetch_emails(
     return emails
 
 
-def fetch_email_body(token: str, email_id: str) -> str:
+from bs4 import BeautifulSoup
+
+
+def fetch_email_body(token: str, email_id: str) -> dict:
     service = get_gmail_service(token)
+
     detail = (
         service.users()
         .messages()
         .get(userId="me", id=email_id, format="full")
         .execute()
     )
+
     payload = detail.get("payload", {})
-    plain = _extract_part_by_type(payload, "text/plain")
-    if plain:
-        return plain
-    html = _extract_part_by_type(payload, "text/html")
-    if html:
-        return html
-    return detail.get("snippet", "")
+
+    headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
+
+    body = _extract_part_by_type(payload, "text/plain")
+    if not body:
+        html = _extract_part_by_type(payload, "text/html")
+        if html:
+            body = BeautifulSoup(html, "html.parser").get_text(
+                separator=" ",
+                strip=True,
+            )
+
+    if not body:
+        body = detail.get("snippet", "")
+
+    return {
+        "subject": headers.get("Subject", ""),
+        "from": headers.get("From", ""),
+        "to": headers.get("To", ""),
+        "date": headers.get("Date", ""),
+        "body": body,
+    }
 
 
 def fetch_email_detail(token: str, email_id: str) -> dict:
