@@ -3,18 +3,22 @@ import LoginPage from "./pages/LoginPage";
 import InboxPage from "./pages/InboxPage";
 
 export default function App() {
-  const [googleToken, setGoogleToken] = useState(
-    () => localStorage.getItem("google_access_token")
+  const [googleToken, setGoogleToken] = useState(() =>
+    localStorage.getItem("google_access_token"),
   );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("access_token");
-    if (token) {
-      localStorage.setItem("google_access_token", token);
-      setGoogleToken(token);
-      window.history.replaceState({}, "", "/");
-    }
+
+    if (!token) return;
+
+    setGoogleToken(token);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("access_token");
+
+    window.history.replaceState({}, "", url.pathname + url.search);
   }, []);
 
   const handleLogout = () => {
@@ -22,7 +26,9 @@ export default function App() {
     setGoogleToken(null);
   };
 
-  return googleToken
-    ? <InboxPage token={googleToken} onLogout={handleLogout} />
-    : <LoginPage />;
+  return googleToken ? (
+    <InboxPage token={googleToken} onLogout={handleLogout} />
+  ) : (
+    <LoginPage />
+  );
 }

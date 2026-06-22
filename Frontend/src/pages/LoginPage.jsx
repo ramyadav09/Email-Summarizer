@@ -10,7 +10,7 @@ export default function LoginPage() {
           className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
         >
           Connect Gmail
-        </a>
+        </a>  
       </div>
     </div>
   );

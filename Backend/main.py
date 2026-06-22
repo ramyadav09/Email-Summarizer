@@ -27,8 +27,16 @@ app.add_middleware(
 
 
 def make_flow():
-    return Flow.from_client_secrets_file(
-        "client_secret.json",
+    client_config = {
+        "web": {
+            "client_id": os.getenv("CLIENT_ID"),
+            "client_secret": os.getenv("CLIENT_SECRET"),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+    }
+    return Flow.from_client_config(
+        client_config,
         scopes=["https://www.googleapis.com/auth/gmail.readonly"],
         redirect_uri="http://localhost:8000/auth/google/callback",
     )
@@ -60,17 +68,15 @@ def auth_login(request: Request):
 
 @app.get("/auth/google/callback")
 def auth_callback(request: Request):
-    import json, requests as req
+    import requests as req
     code = request.query_params.get("code")
     code_verifier = request.session.get("code_verifier")
-    with open("client_secret.json") as f:
-        client_config = json.load(f)["web"]
     token_response = req.post(
         "https://oauth2.googleapis.com/token",
         data={
             "code": code,
-            "client_id": client_config["client_id"],
-            "client_secret": client_config["client_secret"],
+            "client_id": os.getenv("CLIENT_ID"),
+            "client_secret": os.getenv("CLIENT_SECRET"),
             "redirect_uri": "http://localhost:8000/auth/google/callback",
             "grant_type": "authorization_code",
             "code_verifier": code_verifier,
