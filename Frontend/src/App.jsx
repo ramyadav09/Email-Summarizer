@@ -10,15 +10,12 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("access_token");
-
     if (!token) return;
-
+    localStorage.setItem("google_access_token", token);
     setGoogleToken(token);
-
     const url = new URL(window.location.href);
     url.searchParams.delete("access_token");
-
-    window.history.replaceState({}, "", url.pathname + url.search);
+    window.history.replaceState({}, "", url.pathname);
   }, []);
 
   const handleLogout = () => {
