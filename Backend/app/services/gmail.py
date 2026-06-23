@@ -1,11 +1,25 @@
+"""Gmail API service — fetching, reading, and sending emails."""
+
 import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import Flow
-from app.config import CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, SCOPES, ALLOWED_DOMAINS
 from bs4 import BeautifulSoup
+
+from app.core.config import settings
+from sqlalchemy.orm import Session
+from app.core.logging import get_logger
+from fastapi import Depends
+
+from app.services.email_repository import save_email_snippets
+logger = get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
 def _decode_body(data: str) -> str:
@@ -13,7 +27,7 @@ def _decode_body(data: str) -> str:
     return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
 
 
-def _extract_part_by_type(payload, mime_type: str) -> str:
+def _extract_part_by_type(payload: dict, mime_type: str) -> str:
     """Recursively walk MIME parts to find a specific mime type."""
     if payload.get("mimeType") == mime_type and payload.get("body", {}).get("data"):
         return _decode_body(payload["body"]["data"])
@@ -25,30 +39,28 @@ def _extract_part_by_type(payload, mime_type: str) -> str:
     return ""
 
 
-def make_flow() -> Flow:
-    client_config = {
-        "web": {
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }
-    }
-    return Flow.from_client_config(
-        client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI
-    )
-
-
-def get_gmail_service(token: str):
+def _build_service(token: str):
+    """Build an authenticated Gmail API service client."""
     creds = Credentials(token=token)
     return build("gmail", "v1", credentials=creds)
 
 
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
 def fetch_emails(
-    token: str, after: str = None, before: str = None, read_status: str = None
-) -> list:
-    service = get_gmail_service(token)
-    domains = " OR ".join(f"from:(*@{domain})" for domain in ALLOWED_DOMAINS)
+    token: str,
+    db: Session,
+    after: str | None = None,
+    before: str | None = None,
+    read_status: str | None = None,
+) -> list[dict]:
+    """Fetch a list of emails from Gmail filtered by domain and date range."""
+    service = _build_service(token)
+
+    domains = " OR ".join(f"from:(*@{d})" for d in settings.ALLOWED_DOMAINS)
     query = f"({domains})"
     if after:
         query += f" after:{after}"
@@ -56,10 +68,15 @@ def fetch_emails(
         query += f" before:{before}"
     if read_status:
         query += f" is:{read_status}"
+
+    logger.info("Fetching emails with query: %s", query)
+
     results = (
         service.users().messages().list(userId="me", q=query, maxResults=20).execute()
-    )  # return msg's ids
-    messages = results.get("messages", [])
+    )
+    messages = results.get("messages", [])  # ids and threadIds
+    logger.info("Found %d messages", len(messages))
+
     emails = []
     for msg in messages:
         detail = (
@@ -72,11 +89,10 @@ def fetch_emails(
                 metadataHeaders=["From", "Subject"],
             )
             .execute()
-        )
+        )   #msg details with snippet
         headers = {h["name"]: h["value"] for h in detail["payload"]["headers"]}
         label_ids = detail.get("labelIds", [])
-        emails.append(
-            {
+        record={
                 "id": msg["id"],
                 "from": headers.get("From", ""),
                 "subject": headers.get("Subject", ""),
@@ -84,64 +100,18 @@ def fetch_emails(
                 "summary": None,
                 "is_read": "UNREAD" not in label_ids,
             }
-        )
+        emails.append(record)
+
+    save_email_snippets(db, emails)
     return emails
 
 
-def get_thread_id(token: str, email_id: str):
-
-    service = get_gmail_service(token)
-    message = service.users().messages().get(userId="me", id=email_id).execute()
-    return message["threadId"]
-
-
-def fetch_email_body(token: str, email_id: str) -> dict:
-    service = get_gmail_service(token)
-
-    detail = (
-        service.users()
-        .messages()
-        .get(userId="me", id=email_id, format="full")
-        .execute()
-    )
-
-    payload = detail.get("payload", {})
-
-    headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
-
-    body = _extract_part_by_type(payload, "text/plain")
-    if not body:
-        html = _extract_part_by_type(payload, "text/html")
-        if html:
-            body = BeautifulSoup(html, "html.parser").get_text(
-                separator=" ",
-                strip=True,
-            )
-
-    if not body:
-        body = detail.get("snippet", "")
-
-    return {
-        "subject": headers.get("Subject", ""),
-        "from": headers.get("From", ""),
-        "to": headers.get("To", ""),
-        "date": headers.get("Date", ""),
-        "body": body,
-    }
-
-
-def mark_as_read(token: str, email_id: str):
-    """Remove the UNREAD label from a message to mark it as read."""
-    service = get_gmail_service(token)
-    service.users().messages().modify(
-        userId="me",
-        id=email_id,
-        body={"removeLabelIds": ["UNREAD"]},
-    ).execute()
-
-
 def fetch_email_detail(token: str, email_id: str) -> dict:
-    service = get_gmail_service(token)
+    """Fetch the full detail of a single email and mark it as read."""
+    service = _build_service(token)
+
+    logger.debug("Fetching detail for email_id=%s", email_id)
+
     detail = (
         service.users()
         .messages()
@@ -151,24 +121,25 @@ def fetch_email_detail(token: str, email_id: str) -> dict:
     payload = detail.get("payload", {})
     headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
 
-    # extract plain text and html bodies
+    # Extract plain text and html bodies
     body_plain = _extract_part_by_type(payload, "text/plain")
     body_html = _extract_part_by_type(payload, "text/html")
 
-    # fallback: if neither found, use snippet
+    # Fallback: if neither found, use snippet
     if not body_plain and not body_html:
         body_plain = detail.get("snippet", "")
 
-    # extract labels
+    # Extract labels and mark as read
     labels = detail.get("labelIds", [])
     is_read = "UNREAD" not in labels
 
-    # mark as read in Gmail
     if not is_read:
         try:
-            mark_as_read(token, email_id)
+            _mark_as_read(service, email_id)
         except Exception:
-            pass  # non-critical, don't block the response
+            logger.warning(
+                "Failed to mark email_id=%s as read", email_id, exc_info=True
+            )
 
     return {
         "id": email_id,
@@ -192,10 +163,10 @@ def send_reply(
     to: str,
     subject: str,
     body: str,
-    original_message_id: str = None,
+    original_message_id: str | None = None,
 ) -> dict:
     """Send a reply email within the same Gmail thread."""
-    service = get_gmail_service(token)
+    service = _build_service(token)
 
     msg = MIMEMultipart("alternative")
     msg["To"] = to
@@ -208,6 +179,8 @@ def send_reply(
 
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
 
+    logger.info("Sending reply in thread_id=%s to=%s", thread_id, to)
+
     result = (
         service.users()
         .messages()
@@ -218,4 +191,21 @@ def send_reply(
         .execute()
     )
 
+    logger.info("Reply sent: message_id=%s", result.get("id"))
+
     return {"messageId": result.get("id"), "threadId": result.get("threadId")}
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+
+def _mark_as_read(service, email_id: str) -> None:
+    """Remove the UNREAD label from a message."""
+    service.users().messages().modify(
+        userId="me",
+        id=email_id,
+        body={"removeLabelIds": ["UNREAD"]},
+    ).execute()
+    logger.debug("Marked email_id=%s as read", email_id)
