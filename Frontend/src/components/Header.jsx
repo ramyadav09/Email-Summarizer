@@ -4,11 +4,11 @@ export default function Header({ onLogout }) {
   const { pathname } = useLocation();
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+    <header className="bg-white/70 backdrop-blur-md border-b border-gray-200/50 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
       <div className="flex items-center gap-4">
-        <Link to="/inbox" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="text-xl">📧</span>
-          <h1 className="text-base font-bold text-indigo-600 tracking-tight">
+        <Link to="/inbox" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+          <span className="text-2xl drop-shadow-sm">📧</span>
+          <h1 className="font-heading text-lg font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent tracking-tight">
             Email Summarizer
           </h1>
         </Link>
@@ -23,7 +23,7 @@ export default function Header({ onLogout }) {
       </div>
       <button
         onClick={onLogout}
-        className="text-sm px-4 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+        className="text-sm font-medium px-4 py-2 rounded-xl border border-gray-200/80 text-gray-600 hover:bg-gray-50 hover:text-gray-900 active:scale-95 transition-all shadow-sm"
       >
         Logout
       </button>

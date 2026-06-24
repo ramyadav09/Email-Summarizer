@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.logging import get_logger
-from app.models.email import User
+from app.models.email import User, Email
 from app.schemas.email import (
     SummarizeRequest,
     SummarizeResponse,
@@ -117,7 +117,8 @@ def summarize_email(
         summary_text = summarize(body_text)
 
         # Persist to cache
-        if get_cached_summary(db, current_user.id, req.id) is None:
+        existing_email = db.query(Email).filter(Email.user_id == current_user.id, Email.email_id == req.id).first()
+        if not existing_email:
             # Build full email data for a new record
             if not detail:
                 try:

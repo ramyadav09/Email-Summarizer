@@ -3,8 +3,8 @@ export default function EmailCard({ email, onView }) {
 
   return (
     <div
-      className={`bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow ${
-        isRead ? "border-gray-200" : "border-indigo-200 bg-indigo-50/30"
+      className={`group bg-white border rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300 ${
+        isRead ? "border-gray-100" : "border-indigo-100 bg-indigo-50/20"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -42,7 +42,7 @@ export default function EmailCard({ email, onView }) {
               {email.subject}
             </h3>
             <p
-              className={`text-sm mt-1 line-clamp-2 ${
+              className={`text-sm mt-0.5 truncate ${
                 isRead ? "text-gray-500" : "text-gray-600"
               }`}
             >
@@ -52,7 +52,7 @@ export default function EmailCard({ email, onView }) {
         </div>
         <button
           onClick={() => onView(email)}
-          className="shrink-0 text-sm px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 active:scale-95 transition-all"
+          className="opacity-0 group-hover:opacity-100 shrink-0 text-sm font-medium px-4 py-2 rounded-xl border border-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white active:scale-95 transition-all shadow-sm"
         >
           View
         </button>

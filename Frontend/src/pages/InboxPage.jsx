@@ -68,15 +68,15 @@ export default function InboxPage({ onLogout }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50/50">
       <Header onLogout={onLogout} />
       <main className="max-w-2xl mx-auto px-4 py-8">
 
         {/* Actions Bar */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
+        <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-5 mb-8 shadow-[0_4px_16px_rgba(0,0,0,0.02)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-semibold text-gray-800">
                 {loaded ? `${total} email${total !== 1 ? "s" : ""}` : "Your Inbox"}
               </p>
               <p className="text-xs text-gray-400">
@@ -86,10 +86,10 @@ export default function InboxPage({ onLogout }) {
             {isNotLinked ? (
               <button
                 onClick={handleConnectGoogle}
-                className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"
+                className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-medium rounded-xl hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
                 </svg>
                 Connect Gmail Account
               </button>
@@ -97,14 +97,16 @@ export default function InboxPage({ onLogout }) {
               <button
                 onClick={handleSyncFromGoogle}
                 disabled={syncLoading}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-60 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"
+                className="px-5 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-xl border border-gray-200 hover:bg-gray-50 hover:text-indigo-600 disabled:opacity-60 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap shadow-sm"
               >
                 {syncLoading && (
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                 )}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
+                {!syncLoading && (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
                 {syncLoading ? "Refreshing…" : "Refresh"}
               </button>
             )}
@@ -142,11 +144,11 @@ export default function InboxPage({ onLogout }) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-4 mt-6 shadow-sm">
+              <div className="flex items-center justify-between bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl p-4 mt-8 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
                 <button
                   disabled={page <= 1 || syncLoading}
                   onClick={() => dispatch(fetchEmails({ token, page: page - 1, limit: 20 }))}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white active:scale-95 transition-all font-medium flex items-center gap-1.5"
+                  className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white active:scale-95 transition-all font-medium flex items-center gap-1.5 shadow-sm"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -159,7 +161,7 @@ export default function InboxPage({ onLogout }) {
                 <button
                   disabled={page >= totalPages || syncLoading}
                   onClick={() => dispatch(fetchEmails({ token, page: page + 1, limit: 20 }))}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white active:scale-95 transition-all font-medium flex items-center gap-1.5"
+                  className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white active:scale-95 transition-all font-medium flex items-center gap-1.5 shadow-sm"
                 >
                   Next
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

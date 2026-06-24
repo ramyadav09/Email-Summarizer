@@ -141,17 +141,17 @@ export default function EmailPage({ onLogout }) {
   /* ---------- loading skeleton ---------- */
   if (loading || (!email && !error)) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-slate-50/50">
         <Header onLogout={onLogout} />
-        <main className="max-w-3xl mx-auto px-4 py-4">
+        <main className="max-w-3xl mx-auto px-4 py-8">
           <div className="animate-pulse">
-            <div className="h-4 w-32 bg-gray-200 rounded mb-6" />
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-              <div className="p-6 space-y-3">
+            <div className="h-4 w-32 bg-gray-200 rounded mb-8" />
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+              <div className="p-8 space-y-4">
                 <div className="h-6 w-3/4 bg-gray-200 rounded" />
                 <div className="h-4 w-1/2 bg-gray-200 rounded" />
               </div>
-              <div className="border-t border-gray-100 p-6 space-y-3">
+              <div className="border-t border-gray-100 p-8 space-y-4">
                 <div className="h-4 w-full bg-gray-100 rounded" />
                 <div className="h-4 w-full bg-gray-100 rounded" />
                 <div className="h-4 w-full bg-gray-100 rounded" />
@@ -204,22 +204,22 @@ export default function EmailPage({ onLogout }) {
   const hasHtml = !!email.body_html;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50/50">
       <Header onLogout={onLogout} />
-      <main className="max-w-3xl mx-auto px-4 py-4">
+      <main className="max-w-3xl mx-auto px-4 py-8">
         {/* Back button */}
         <button
           onClick={handleBack}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-600 mb-3 transition-colors group"
+          className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-indigo-600 mb-6 transition-colors group"
         >
-          <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Back to Inbox
         </button>
 
         {/* Email card — mail UI style */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
 
           {/* Subject + sender header */}
           <div className="px-4 pt-4 pb-3">
@@ -297,21 +297,21 @@ export default function EmailPage({ onLogout }) {
           <div className="mx-4 border-t border-gray-100" />
 
           {/* Summarize section */}
-          <div className="px-4 py-3">
+          <div className="px-5 py-4">
             {!summary ? (
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleSummarize}
                   disabled={summaryLoading}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 active:scale-95 transition-all shadow-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-medium rounded-xl hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:-translate-y-0.5 disabled:opacity-50 active:scale-95 transition-all"
                 >
                   {summaryLoading && (
-                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
                   {summaryLoading ? "Summarizing\u2026" : "\u2728 Summarize with AI"}
                 </button>
                 {summaryError && (
-                  <p className="text-xs text-red-500">{summaryError}</p>
+                  <p className="text-sm text-red-500">{summaryError}</p>
                 )}
               </div>
             ) : (
@@ -390,15 +390,15 @@ export default function EmailPage({ onLogout }) {
           <div className="mx-4 border-t border-gray-100" />
 
           {/* Reply section */}
-          <div className="px-4 py-3">
+          <div className="px-5 py-4">
             {!showReply && !replyDraft ? (
               <button
                 onClick={handleGenerateReply}
                 disabled={replyLoading}
-                className="flex items-center gap-1.5 px-3.5 py-2 border border-indigo-200 text-indigo-600 text-xs font-medium rounded-lg hover:bg-indigo-50 disabled:opacity-50 active:scale-95 transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 border border-indigo-200 text-indigo-600 text-sm font-medium rounded-xl hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 active:scale-95 transition-all"
               >
                 {replyLoading && (
-                  <span className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                 )}
                 {replyLoading ? "Generating\u2026" : "\u21a9 Generate AI Reply"}
               </button>
@@ -440,14 +440,14 @@ export default function EmailPage({ onLogout }) {
                   <p className="text-[10px] text-red-500">{replyError}</p>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 mt-3">
                   <button
                     onClick={handleSendReply}
                     disabled={sendLoading || !replyDraft.trim() || sendSuccess}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 active:scale-95 transition-all shadow-sm"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-medium rounded-xl hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:-translate-y-0.5 disabled:opacity-50 active:scale-95 transition-all shadow-sm"
                   >
                     {sendLoading && (
-                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     )}
                     {sendLoading ? "Sending\u2026" : sendSuccess ? "\u2713 Sent" : "Send Reply"}
                   </button>

@@ -34,12 +34,12 @@ export default function RegisterPage() {
   const displayError = localError || error;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl shadow-xl p-10 max-w-md w-full text-center border border-gray-100">
-        <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <span className="text-3xl">🚀</span>
+    <div className="min-h-screen bg-slate-50/50 flex items-center justify-center px-4 py-8">
+      <div className="bg-white/80 backdrop-blur-md rounded-[24px] shadow-[0_8px_32px_rgba(0,0,0,0.04)] p-10 max-w-md w-full text-center border border-gray-100">
+        <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+          <span className="text-3xl drop-shadow-sm">🚀</span>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+        <h1 className="font-heading text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent mb-2">Create Account</h1>
         <p className="text-gray-500 mb-6 text-sm leading-relaxed">
           Get started with AI-powered email summaries
         </p>
@@ -98,7 +98,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-5 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full px-5 py-3.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl font-medium hover:shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {loading && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
