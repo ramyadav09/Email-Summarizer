@@ -1,14 +1,12 @@
 """Email router — inbox, detail, summarization, reply generation, and sending."""
 
-import email.utils
-
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.logging import get_logger
-from app.models.email import User, Email
+from app.models.email import User
 from app.schemas.email import (
     SummarizeRequest,
     SummarizeResponse,
@@ -18,7 +16,7 @@ from app.schemas.email import (
     SendReplyResponse,
 )
 from app.services.gmail import fetch_emails, fetch_email_detail, send_reply
-from app.services.email_repository import get_cached_summary, update_summary, save_email, get_user_emails_from_db, get_email_from_db
+from app.services.email_repository import get_user_emails_from_db, get_email_from_db
 from app.services.generation import summarize, generate_reply
 
 logger = get_logger(__name__)
@@ -92,19 +90,11 @@ def get_email_by_id(
 def summarize_email(
     req: SummarizeRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
-    """Summarize an email body using AI. Returns cached summary if available."""
-    # Check cache first
-    cached = get_cached_summary(db, current_user.id, req.id)
-    if cached:
-        logger.info("Returning cached summary for email_id=%s", req.id)
-        return SummarizeResponse(summary=cached)
-
+    """Summarize an email body using AI. Returns the summary without saving to DB."""
     try:
         # Resolve email body text
         body_text = req.body
-        detail = None
         if not body_text:
             detail = fetch_email_detail(current_user, req.id)
             body_text = (
@@ -116,42 +106,7 @@ def summarize_email(
         # Generate summary via LLM
         summary_text = summarize(body_text)
 
-        # Persist to cache
-        existing_email = db.query(Email).filter(Email.user_id == current_user.id, Email.email_id == req.id).first()
-        if not existing_email:
-            # Build full email data for a new record
-            if not detail:
-                try:
-                    detail = fetch_email_detail(current_user, req.id)
-                except Exception:
-                    detail = {}
-
-            received_dt = None
-            if detail.get("date"):
-                try:
-                    received_dt = email.utils.parsedate_to_datetime(detail["date"])
-                except Exception:
-                    pass
-
-            save_email(
-                db,
-                current_user.id,
-                {
-                    "email_id": req.id,
-                    "thread_id": detail.get("thread_id", ""),
-                    "from_address": detail.get("from", "Unknown"),
-                    "to_address": detail.get("to", "Unknown"),
-                    "subject": detail.get("subject", ""),
-                    "body_html": detail.get("body_html"),
-                    "body_text": detail.get("body") or body_text,
-                    "received_at": received_dt,
-                    "summary": summary_text,
-                },
-            )
-        else:
-            update_summary(db, current_user.id, req.id, summary_text)
-
-        logger.info("Generated and cached summary for email_id=%s", req.id)
+        logger.info("Generated summary for email_id=%s (not cached)", req.id)
         return SummarizeResponse(summary=summary_text)
 
     except Exception as exc:
