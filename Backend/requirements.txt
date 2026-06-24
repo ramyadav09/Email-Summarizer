@@ -11,3 +11,6 @@ langchain-community
 langchain-mistralai
 langchain-core
 pydantic-settings
+bcrypt
+PyJWT
+psycopg2-binary

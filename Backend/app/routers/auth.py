@@ -1,25 +1,89 @@
-"""Authentication router — Google OAuth 2.0 login flow."""
+"""Authentication router — user registration, login, and Google OAuth 2.0 flow."""
 
 import hashlib
 import base64
 import secrets
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.core.logging import get_logger
+from app.core.security import create_access_token
+from app.models.email import User
+from app.schemas.user import TokenResponse, UserLoginRequest, UserRegisterRequest, UserResponse
 from app.services.oauth import make_flow
+from app.services.user_service import (
+    authenticate_user,
+    link_google_tokens,
+    register_user,
+)
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.get("/login")
-def auth_login(request: Request):
-    """Initiate the Google OAuth 2.0 login flow with PKCE."""
+# ---------------------------------------------------------------------------
+# Email/Password Auth
+# ---------------------------------------------------------------------------
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+def auth_register(req: UserRegisterRequest, db: Session = Depends(get_db)):
+    """Register a new user with name, email, and password."""
+    try:
+        user = register_user(db, name=req.name, email=req.email, password=req.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    token = create_access_token(user.id, user.email)
+    logger.info("New user registered: user_id=%d", user.id)
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse.model_validate(user),
+    )
+
+
+@router.post("/login", response_model=TokenResponse)
+def auth_login_password(req: UserLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate with email and password."""
+    user = authenticate_user(db, email=req.email, password=req.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        )
+
+    token = create_access_token(user.id, user.email)
+    logger.info("User logged in: user_id=%d", user.id)
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse.model_validate(user),
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+def auth_get_me(current_user: User = Depends(get_current_user)):
+    """Get the current authenticated user's profile."""
+    return UserResponse.model_validate(current_user)
+
+
+# ---------------------------------------------------------------------------
+# Google OAuth — links Gmail to an existing authenticated user account
+# ---------------------------------------------------------------------------
+
+
+@router.get("/google")
+def auth_google(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Initiate the Google OAuth 2.0 flow. Redirects user directly to Google."""
+    from fastapi.responses import RedirectResponse
     code_verifier = secrets.token_urlsafe(64)
     code_challenge = (
         base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
@@ -36,14 +100,17 @@ def auth_login(request: Request):
         code_challenge_method="S256",
     )
     request.session["oauth_state"] = state
+    # Store the user_id so the callback knows which user to link
+    request.session["oauth_user_id"] = current_user.id
 
-    logger.info("OAuth login initiated, redirecting to Google")
-    return RedirectResponse(authorization_url)
+    logger.info("Google OAuth initiated for user_id=%d", current_user.id)
+    return RedirectResponse(url=authorization_url)
 
 
 @router.get("/google/callback")
-def auth_callback(request: Request):
-    """Handle the Google OAuth 2.0 callback and exchange code for token."""
+def auth_google_callback(request: Request, db: Session = Depends(get_db)):
+    """Handle the Google OAuth 2.0 callback."""
+    from fastapi.responses import RedirectResponse
     code = request.query_params.get("code")
     state = request.query_params.get("state")
 
@@ -61,7 +128,14 @@ def auth_callback(request: Request):
         logger.warning("OAuth callback missing code verifier in session")
         raise HTTPException(status_code=400, detail="Missing code verifier")
 
-    # Exchange authorization code for access token
+    user_id: int | None = request.session.get("oauth_user_id")
+    if user_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="OAuth session missing user context. Please start the flow again.",
+        )
+
+    # Exchange authorization code for tokens
     try:
         response = httpx.post(
             "https://oauth2.googleapis.com/token",
@@ -85,14 +159,23 @@ def auth_callback(request: Request):
 
     token_data = response.json()
     access_token = token_data.get("access_token")
+    refresh_token = token_data.get("refresh_token")
 
     if not access_token:
         logger.error("Token exchange response missing access_token")
         raise HTTPException(status_code=400, detail="Failed to obtain access token")
 
+    # Persist Google tokens to the user record
+    link_google_tokens(db, user_id=user_id, access_token=access_token, refresh_token=refresh_token)
+
     # Cleanup temporary OAuth session data
     request.session.pop("oauth_state", None)
     request.session.pop("code_verifier", None)
+    request.session.pop("oauth_user_id", None)
 
-    logger.info("OAuth flow completed successfully")
-    return RedirectResponse(url=f"{settings.FRONTEND_URL}/?access_token={access_token}")
+    logger.info("Google OAuth completed for user_id=%d", user_id)
+
+    # Issue a fresh JWT and redirect to frontend
+    user = db.query(User).filter(User.id == user_id).first()
+    jwt_token = create_access_token(user.id, user.email)
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/?access_token={jwt_token}")

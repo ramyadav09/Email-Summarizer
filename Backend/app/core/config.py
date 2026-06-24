@@ -14,7 +14,7 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.send",
     ]
-    ALLOWED_DOMAINS: List[str] = ["kiit.ac.in", "seagol.com"]
+    ALLOWED_DOMAINS: List[str] = ["kiit.ac.in", "seagol.com","gmail.com"]
 
     # LLM
     MISTRAL_API_KEY: str

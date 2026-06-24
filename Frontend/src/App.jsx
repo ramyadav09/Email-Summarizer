@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { setToken, logout } from "./store/authSlice";
+import { setToken, logout, setUser } from "./store/authSlice";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import InboxPage from "./pages/InboxPage";
 import EmailPage from "./pages/EmailPage";
 
@@ -15,12 +16,16 @@ export default function App() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const token = useSelector((s) => s.auth.token);
+  const user = useSelector((s) => s.auth.user);
 
-  /* synchronously capture OAuth token from URL before any routing */
+  /* capture OAuth token from URL (Google callback redirect) */
   const params = new URLSearchParams(window.location.search);
   const oauthToken = params.get("access_token");
   if (oauthToken && oauthToken !== token) {
     dispatch(setToken(oauthToken));
+    if (user) {
+      dispatch(setUser({ ...user, is_google_linked: true }));
+    }
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete("access_token");
     window.history.replaceState({}, "", cleanUrl.pathname);
@@ -35,6 +40,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/inbox" replace /> : <LoginPage />} />
+      <Route path="/register" element={token ? <Navigate to="/inbox" replace /> : <RegisterPage />} />
       <Route
         path="/inbox"
         element={
@@ -55,3 +61,4 @@ export default function App() {
     </Routes>
   );
 }
+

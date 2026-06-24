@@ -6,17 +6,36 @@ const API = "http://localhost:8000";
 /* ---------- async thunks ---------- */
 export const fetchEmails = createAsyncThunk(
   "email/fetchEmails",
-  async ({ token, after, before, readStatus }, { rejectWithValue }) => {
+  async ({ token, page = 1, limit = 10 }, { rejectWithValue }) => {
     try {
-      const params = new URLSearchParams();
-      if (after) params.set("after", after.replace(/-/g, "/"));
-      if (before) params.set("before", before.replace(/-/g, "/"));
-      if (readStatus) params.set("read_status", readStatus);
-
-      const res = await fetch(`${API}/api/emails?${params.toString()}`, {
+      const res = await fetch(`${API}/api/emails?page=${page}&limit=${limit}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403) return rejectWithValue({ status: 403, detail: data.detail || "Google account not linked" });
+        throw new Error(data.detail || await res.text());
+      }
+      return await res.json();
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const syncEmails = createAsyncThunk(
+  "email/syncEmails",
+  async ({ token, page = 1, limit = 10 }, { rejectWithValue }) => {
+    try {
+      const res = await fetch(`${API}/api/emails/sync?page=${page}&limit=${limit}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403) return rejectWithValue({ status: 403, detail: data.detail || "Google account not linked" });
+        throw new Error(data.detail || "Sync failed");
+      }
       return await res.json();
     } catch (err) {
       return rejectWithValue(err.message);
@@ -114,23 +133,20 @@ export const sendReply = createAsyncThunk(
 );
 
 /* ---------- slice ---------- */
-const today = new Date().toISOString().split("T")[0];
-const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  .toISOString()
-  .split("T")[0];
-
 const emailSlice = createSlice({
   name: "email",
   initialState: {
     list: [],
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
     selected: null,
     summaries: {},
     generatedReplies: {},
-    filters: {
-      after: thirtyDaysAgo,
-      before: today,
-      readStatus: "",
-    },
+    googleNotLinked: false,
+    syncLoading: false,
+    syncError: null,
     loading: false,
     detailLoading: false,
     summaryLoading: false,
@@ -145,9 +161,8 @@ const emailSlice = createSlice({
     sendSuccess: false,
   },
   reducers: {
-    setFilter(state, action) {
-      const { key, value } = action.payload;
-      state.filters[key] = value;
+    setGoogleNotLinked(state, action) {
+      state.googleNotLinked = action.payload;
     },
     clearSelected(state) {
       state.selected = null;
@@ -169,21 +184,71 @@ const emailSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    /* fetch emails */
+    /* fetch emails from DB */
     builder
       .addCase(fetchEmails.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.googleNotLinked = false;
       })
       .addCase(fetchEmails.fulfilled, (state, action) => {
         state.loading = false;
-        state.list = Array.isArray(action.payload) ? action.payload : [];
+        if (action.payload && typeof action.payload === 'object' && !Array.isArray(action.payload)) {
+          state.list = Array.isArray(action.payload.emails) ? action.payload.emails : [];
+          state.total = action.payload.total || 0;
+          state.page = action.payload.page || 1;
+          state.limit = action.payload.limit || 10;
+          state.totalPages = action.payload.total_pages || 0;
+        } else {
+          state.list = Array.isArray(action.payload) ? action.payload : [];
+          state.total = state.list.length;
+          state.page = 1;
+          state.totalPages = 1;
+        }
         state.loaded = true;
       })
       .addCase(fetchEmails.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || "Failed to load emails.";
+        if (action.payload?.status === 403) {
+          state.googleNotLinked = true;
+        }
+        state.error = typeof action.payload === 'string' ? action.payload : action.payload?.detail || "Failed to load emails.";
         state.loaded = true;
+      });
+
+    /* sync emails from Google */
+    builder
+      .addCase(syncEmails.pending, (state) => {
+        state.syncLoading = true;
+        state.syncError = null;
+        state.googleNotLinked = false;
+      })
+      .addCase(syncEmails.fulfilled, (state, action) => {
+        state.syncLoading = false;
+        if (action.payload && typeof action.payload === 'object' && !Array.isArray(action.payload)) {
+          // Only overwrite the email list and pagination state if new emails were fetched.
+          // Otherwise, we keep the previous fetched emails visible on the page.
+          if (action.payload.new_emails_count === undefined || action.payload.new_emails_count > 0) {
+            state.list = Array.isArray(action.payload.emails) ? action.payload.emails : [];
+            state.total = action.payload.total || 0;
+            state.page = action.payload.page || 1;
+            state.limit = action.payload.limit || 10;
+            state.totalPages = action.payload.total_pages || 0;
+          }
+        } else {
+          state.list = Array.isArray(action.payload) ? action.payload : [];
+          state.total = state.list.length;
+          state.page = 1;
+          state.totalPages = 1;
+        }
+        state.loaded = true;
+      })
+      .addCase(syncEmails.rejected, (state, action) => {
+        state.syncLoading = false;
+        if (action.payload?.status === 403) {
+          state.googleNotLinked = true;
+        }
+        state.syncError = typeof action.payload === 'string' ? action.payload : action.payload?.detail || "Sync failed.";
       });
 
     /* fetch single email */
@@ -255,5 +320,5 @@ const emailSlice = createSlice({
   },
 });
 
-export const { setFilter, clearSelected, clearError, setReplyDraft, clearSendStatus } = emailSlice.actions;
+export const { setGoogleNotLinked, clearSelected, clearError, setReplyDraft, clearSendStatus } = emailSlice.actions;
 export default emailSlice.reducer;
