@@ -8,14 +8,21 @@ A full-stack app that fetches emails from Gmail and summarizes them using Mistra
 Email-Summarizer/
 ├── Backend/
 │   ├── app/
+│   │   ├── core/
+│   │   │   ├── config.py        # Settings via pydantic-settings
+│   │   │   ├── database.py      # SQLAlchemy setup
+│   │   │   ├── dependencies.py
+│   │   │   └── logging.py
+│   │   ├── models/              # SQLAlchemy models
 │   │   ├── routers/
 │   │   │   ├── auth.py          # /auth/login, /auth/google/callback
-│   │   │   └── emails.py        # /api/emails, /api/summarize
+│   │   │   └── emails.py        # /api/emails, /api/summarize, /api/generate-response, /api/send-reply
+│   │   ├── schemas/             # Pydantic schemas
 │   │   ├── services/
-│   │   │   ├── gmail.py         # Gmail API logic
-│   │   │   └── summarizer.py    # Mistral/LangChain summarization
-│   │   └── config.py            # Env vars
-│   ├── main.py                  # FastAPI app entry point
+│   │   │   ├── email_repository.py # DB operations
+│   │   │   ├── generation.py    # Mistral AI logic (summarize, reply)
+│   │   │   └── gmail.py         # Gmail API logic
+│   │   └── main.py              # FastAPI app entry point
 │   ├── requirements.txt
 │   └── .env
 └── Frontend/
@@ -26,8 +33,7 @@ Email-Summarizer/
     │   ├── pages/
     │   │   ├── LoginPage.jsx
     │   │   └── InboxPage.jsx
-    │   ├── data/
-    │   │   └── mockEmails.js
+    │   ├── store/               # Redux Toolkit store
     │   └── App.jsx
     ├── package.json
     └── vite.config.js
@@ -56,12 +62,13 @@ Create a `.env` file in `Backend/`:
 CLIENT_ID=<your_google_client_id>
 CLIENT_SECRET=<your_google_client_secret>
 MISTRAL_API_KEY=<your_mistral_api_key>
+DEBUG=True
 ```
 
 Start the server:
 
 ```bash
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 Backend runs at `http://localhost:8000`.
@@ -90,16 +97,21 @@ Frontend runs at `http://localhost:5173`.
 |--------|----------|-------------|
 | GET | `/auth/login` | Starts Google OAuth flow |
 | GET | `/auth/google/callback` | OAuth callback, returns token |
-| GET | `/api/emails?after=YYYY/MM/DD&before=YYYY/MM/DD` | Fetch emails by date range |
-| POST | `/api/summarize` | Summarize an email by ID |
+| GET | `/api/emails?after=YYYY/MM/DD&before=YYYY/MM/DD&read_status=unread` | Fetch emails by date range and read status |
+| GET | `/api/emails/{email_id}` | Fetch full detail of a single email |
+| POST | `/api/summarize` | Summarize an email by ID (uses DB caching) |
+| POST | `/api/generate-response` | Generate an AI-drafted reply |
+| POST | `/api/send-reply` | Send a reply email within the same thread |
 
 ## Features
 
 - Google OAuth 2.0 login
 - Fetch Gmail emails filtered by allowed domains
-- Date range filter (From / To date pickers)
-- AI-powered email summarization using Mistral AI
+- Date range and Read/Unread filters
+- AI-powered email summarization and reply generation using Mistral AI
+- Database caching using SQLAlchemy (SQLite) for faster subsequent loads
 - Token persisted in `localStorage` across page refreshes
+- State management via Redux Toolkit on the frontend
 
 ## Security Notes
 
