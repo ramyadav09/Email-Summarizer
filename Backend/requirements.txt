@@ -14,3 +14,5 @@ pydantic-settings
 bcrypt
 PyJWT
 psycopg2-binary
+itsdangerous
+email-validator
